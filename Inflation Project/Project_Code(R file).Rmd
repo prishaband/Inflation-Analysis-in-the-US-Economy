@@ -1,0 +1,525 @@
+---
+title: "INFLATION ANALYSIS IN THE US ECONOMY"
+output: html_document
+date: "2024-10-30"
+---
+
+# What is inflation?
+  
+Inflation is the sustained increase in the general price level of goods and services over time. Typically measured using indices such as the Consumer Price Index (CPI) and the Producer Price Index (PPI). For my analysis, I'm focusing on CPI.
+
+# What is CPI?
+
+A consumer price index is a price index, the price of a weighted average market basket of consumer goods and services purchased by households. Changes in measured CPI track changes in prices over time. The CPI is calculated by using a representative basket of goods and services
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(tidymodels)
+library(forecast)
+```
+
+# Data Reading
+```{r}
+input_dir <- "C:\\Users\\prish\\OneDrive\\Desktop\\Lehigh\\Intro_to_statistical_modeling\\BandyopadhyayPrisha\\cpi_project_dataset.csv"
+data <- read.csv(input_dir, header = T, sep = ",")
+```
+
+Splitting the sectors for better visualization
+
+```{r}
+# Define the sectors for Group 1
+group1_sectors <- c("Food and beverages", "Apparel", "Alcoholic beverages")
+
+# Split the data
+group1 <- data %>% filter(TITLE %in% group1_sectors)
+group2 <- data %>% filter(!(TITLE %in% group1_sectors))
+
+# Reshaping Group 1 data to long format
+group1_long <- group1 %>%
+  pivot_longer(cols = JAN:DEC, names_to = "Month", values_to = "Value")
+
+# Reshaping Group 1 data to long format
+group2_long <- group2 %>%
+  pivot_longer(cols = JAN:DEC, names_to = "Month", values_to = "Value")
+```
+```{r}
+# Plotting trends for Group 1
+trends_group1 <- ggplot(group1_long, aes(x = YEAR, y = Value, color = TITLE, group = TITLE)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Trends of CPI Values (Group 1: Selected Sectors)",
+       x = "Year", y = "CPI Value", color = "Sector") +
+  theme_minimal() +
+  theme(legend.position = "right")
+trends_group1
+```
+
+# Trends of CPI Values (Group 1: Selected Sectors)
+
+1. Observations:
+
+- Steady Trends: The sectors "Alcoholic beverages" and "Food and Beverages" exhibit relatively stable CPI trends over the years, with minor fluctuations.
+-"Apparel" Sector: This sector shows more variability, with periodic dips and recoveries. The broader range of points in some years might indicate seasonal fluctuations or specific shocks affecting food prices.
+
+- Sector Comparison: "Apparel" has a noticeably larger spread of CPI values across months in each year compared to "Alcoholic beverages" and "Food and Beverages".
+"Food and Beverages" appears to have the most consistent CPI values, suggesting a more stable price structure over time.
+
+2. Insights:
+- Stability in "Food and Beverages" and "Alcoholic beverages" could be due to predictable production and consumption patterns.
+- "Apparel" is likely affected by external factors like weather conditions, supply chain issues, or demand surges.
+
+```{r}
+# Plotting trends for Group 2
+trends_group2 <- ggplot(group2_long, aes(x = YEAR, y = Value, color = TITLE, group = TITLE)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Trends of CPI Values (Group 2: Selected Sectors)",
+       x = "Year", y = "CPI Value", color = "Sector") +
+  theme_minimal() +
+  theme(legend.position = "right")
+trends_group2
+```
+# Trends of CPI Values (Group 2: Other Sectors)
+
+1. Observations:
+
+- Energy Sector Variability: "Energy" exhibits significant swings in CPI values over the years, with notable dips and spikes. This reflects energy price volatility, often tied to global oil prices or geopolitical events.
+
+- Housing and Medical Care: "Housing" shows a steady upward trend, consistent with rising real estate and rental costs. "Medical care" also trends upward but at a slower, more consistent rate.
+
+- Electricity vs. Education: "Electricity" has a mild upward trend but with some variability."Education" appears the most stable, with nearly flat trends, likely reflecting long-term stability in tuition and service fees.
+
+2. Insights:
+- Sectors like "Energy" and "Electricity" show more price sensitivity to external shocks.
+- "Housing" and "Medical care" trends indicate growing costs in these essential sectors, which might concern policymakers.
+- The stability of "Education" could reflect regulated pricing structures.
+
+```{r}
+# Boxplot for Group 1
+boxplot_group1 <- ggplot(group1_long, aes(x = as.factor(YEAR), y = Value, fill = TITLE)) +
+  geom_boxplot() +
+  labs(title = "CPI Value Distribution by Year and Sector (Group 1)",
+       x = "Year", y = "CPI Value", fill = "Sector") +
+  theme_minimal()
+boxplot_group1
+```
+
+# CPI Value Distribution by Year and Sector (Group 1)
+
+1. Observations:
+- "Apparel": The larger boxes and wider whiskers show significant variability in CPI values year over year, with outliers in several years.
+- "Food and Beverages and "Alcoholic beverages": Both sectors have smaller boxes and whiskers, reflecting more consistent CPI values across months in each year.
+- "Food and Beverages" occasionally shows small outliers, possibly due to seasonal demand spikes.
+
+2. Insights:
+- The wider variability in "Apparel" indicates that this sector is more prone to monthly and yearly price changes.
+- The consistency in "Food and Beverages" and "Alcoholic beverages" CPI values suggests less sensitivity to external factors, making these sectors more predictable.
+
+```{r}
+# Boxplot for Group 2
+boxplot_group2 <- ggplot(group2_long, aes(x = as.factor(YEAR), y = Value, fill = TITLE)) +
+  geom_boxplot() +
+  labs(title = "CPI Value Distribution by Year and Sector (Group 2)",
+       x = "Year", y = "CPI Value", fill = "Sector") +
+  theme_minimal()
+boxplot_group2
+```
+# CPI Value Distribution by Year and Sector (Group 2)
+
+1. Observations:
+
+- "Energy" and "Electricity": These sectors have the widest ranges and larger boxes, showing significant variability in CPI values across months and years.
+- "Energy" has frequent outliers, indicating major price fluctuations due to supply-demand imbalances.
+- "Housing" and "Medical care": Both sectors have relatively small boxes with upward shifts over the years, reflecting steady but predictable price increases.
+- "Education": Shows the smallest variability, with little to no outliers, highlighting its stable pricing.
+
+2. Insights:
+- "Energy" and "Electricity" are highly sensitive to external shocks.
+- "Housing" and "Medical care" CPI increases point to a steady rise in living and healthcare costs.
+- "Education" remains the most predictable sector.
+
+
+```{r}
+# Compute average CPI for each group
+group1_avg <- group1_long %>%
+  group_by(YEAR, TITLE) %>%
+  summarize(Average_CPI = mean(Value, na.rm = TRUE))
+
+group2_avg <- group2_long %>%
+  group_by(YEAR, TITLE) %>%
+  summarize(Average_CPI = mean(Value, na.rm = TRUE))
+```
+Comparing the two groups in terms of:
+
+- Average CPI over the years.
+- Trends and seasonality.
+
+```{r}
+# Visualize average CPI comparison
+ggplot() +
+  geom_line(data = group1_avg, aes(x = YEAR, y = Average_CPI, color = TITLE, group = TITLE), linetype = "dashed") +
+  geom_line(data = group2_avg, aes(x = YEAR, y = Average_CPI, color = TITLE, group = TITLE)) +
+  labs(title = "Comparison of Average CPI: Group 1 vs Group 2",
+       x = "Year", y = "Average CPI", color = "Sector") +
+  theme_minimal()
+```
+5. Comparison of Average CPI: Group 1 vs. Group 2
+Observations:
+
+- Group 1 Sectors:
+1. "Apparel" shows significant CPI fluctuations, with periodic peaks and drops.
+2. "Food and beverages" and "Alcoholic beverages" maintain steady CPI averages, with small differences year over year.
+- Group 2 Sectors:
+1. "Energy" and "Electricity stands out with sharp drops and spikes, reflecting global price volatility.
+2. "Housing" and "Medical care" show slow, steady increases, aligning with long-term inflation in these essential categories.
+3. "Education" remains flat, contrasting with the upward trends in "Housing" and "Medical care".
+
+Insights:
+
+Cross-Sector Dynamics:
+- Group 1 appears more stable overall, aside from "Apparel".
+- Group 2 exhibits more pronounced variability, driven by sectors like "Energy" and "Electricty".
+
+# VARIABILITY ACCROSS SECTORS
+```{r}
+data_long <- data %>%
+  pivot_longer(cols = JAN:DEC, names_to = "Month", values_to = "Value")
+
+# Calculate variability (standard deviation and coefficient of variation) for each sector
+sector_variability <- data_long %>%
+  group_by(TITLE) %>%
+  summarize(
+    Mean_CPI = mean(Value, na.rm = TRUE),
+    SD_CPI = sd(Value, na.rm = TRUE),
+    CV_CPI = SD_CPI / Mean_CPI * 100
+  )
+# the barchart shows which sectors has the highest and lowest variabilties
+ggplot(sector_variability, aes(x = reorder(TITLE, -SD_CPI), y = SD_CPI, fill = TITLE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Sector Variability", x = "Sector", y = "Scaled") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+```
+After analyzing the trend patterns, CPI value distributions by year and sector, and variability across different sectors, it is evident that **energy**, **electricity**, and **apparel** exhibit significant variations and fluctuations over time. These fluctuations indicate dynamic behaviors influenced by seasonal patterns, external factors, and economic changes. 
+
+Given this variability, a **time series analysis** using ARIMA modeling was chosen to capture these patterns and predict future trends in these sectors. ARIMA is well-suited for modeling data with trends and seasonality while accommodating fluctuations in the data. Forecasting future values provides valuable insights into expected price movements, helping to understand and prepare for potential impacts in these key sectors. 
+
+# Why not the rest of the sectors?
+The sectors that do not exhibit significant fluctuations, such as **housing**, **medical care**, and **education**, tend to have more stable CPI trends over time. This stability can be attributed to factors like regulated pricing, long-term contracts, and consistent demand. For example, housing prices often follow steady upward trends due to factors like inflation and gradual increases in real estate and rental costs. Similarly, medical care and education are influenced by structured pricing mechanisms and predictable consumption patterns, which reduce variability. As a result, these sectors are less prone to external shocks or seasonal effects compared to more dynamic sectors like energy and apparel.
+
+# Time Series Analsis and Forecasting for Energy Sector
+
+```{r}
+# Filter data for Energy sector
+energy_data <- group2_long %>%
+  filter(TITLE == "Energy") %>%
+  select(YEAR, Value)
+```
+
+#Converting the Energy CPI data into a time series object
+```{r}
+# Create a time series object
+energy_ts <- ts(energy_data$Value, start = c(2014, 1), frequency = 12) # Monthly frequency
+```
+Fitting an ARIMA model to the time series data - Automatically identifies the best fitting ARIMA model by optimizing the parameters p(Autoregressive), d(Differencing), q(Moving Average) 
+=> The summary gives the p, d, q values, coefficients pf the model, Diagnostic statistics like AIC, BIC and residual standard errors
+
+```{r}
+# Fit ARIMA model
+energy_arima <- auto.arima(energy_ts)
+
+# Display model summary
+summary(energy_arima)
+```
+
+```{r}
+# Performs diagnostic on the residuals (errors) of the fitted model - Helps validates whether the ARIMA model is appropriate for the data
+checkresiduals(energy_arima)
+```
+
+# The Ljung-Box test for Energy
+The results provide valuable insight into whether the residuals from the ARIMA model are independent (i.e., no significant autocorrelation remains).
+
+The hypothesis for the Ljung-Box test is:
+
+H₀: The residuals are independent (i.e., there is no autocorrelation in the residuals). 
+H₁: The residuals are not independent (i.e., there is significant autocorrelation)
+
+- Test Statistic,  Q∗=29.174: This is the value of the Ljung-Box test statistic.
+- Degrees of Freedom (df) = 19: This is calculated based on the number of lags minus the number of estimated parameters in the model.
+- p-value = 0.0633: The p-value is slightly above the standard significance level of 
+0.05
+
+Conclusion:
+
+No Significant Autocorrelation: Since p=0.0633 is greater than 0.05, we fail to reject the null hypothesis of the Ljung-Box test. This suggests that there is no significant autocorrelation remaining in the residuals.
+
+Model Adequacy:
+The residuals appear to be white noise, indicating that the ARIMA model adequately captures the patterns in the data.
+
+# Residual Diagnostics for Energy
+
+Observations:
+
+1. Time Series Residuals (Top Plot):
+
+- The residuals fluctuate around zero, with no apparent systematic patterns or trends over time.
+- There are occasional spikes, but they do not appear to exhibit a consistent structure, suggesting the model adequately captures the data's underlying patterns.
+
+2. ACF Plot (Bottom Left):
+
+- Most autocorrelation values fall within the blue confidence bands, indicating minimal remaining autocorrelation in the residuals.
+- A few small spikes outside the bands at lags (e.g., lag 12) might suggest some seasonal effects that the model may not fully capture, but these are not statistically significant.
+
+3. Residual Distribution (Bottom Right):
+
+- The residuals form a near-symmetric histogram, closely following the overlaid normal curve.
+- This suggests that the residuals are approximately normally distributed, a desirable property for ARIMA models.
+
+Key Insights:
+
+- The residuals behaving as white noise (independent and identically distributed) confirms the model's adequacy.
+- The Ljung-Box test results further validate this by showing no significant autocorrelation (p-value > 0.05).
+- The slight seasonal lag in the ACF might hint at room for minor refinements, but the model performs well overall.
+
+# Forecast for Energy CPI 
+```{r}
+# Generating forecast for the next 12 months using the fitted ARIMA model and visualize them
+forecast_energy <- forecast(energy_arima, h = 12)
+autoplot(forecast_energy) +
+  labs(title = "Forecast for Energy CPI", y = "CPI", x = "Time")
+```
+Sector: Energy
+
+Observations
+
+1. Seasonality:
+
+- The forecast reflects the strong seasonal pattern observed in the historical data, with predictable peaks and troughs repeating annually.
+- This aligns with the behavior of energy prices, which are often influenced by seasonal factors such as heating demand in winter or increased travel in summer.
+
+2. Confidence Intervals:
+
+- The forecast includes a shaded confidence interval, widening slightly as the forecast horizon increases.
+- The relatively narrow interval suggests high confidence in the short-term predictions, likely due to the strong seasonal structure captured by the model.
+
+3. Trend:
+
+- There is no clear long-term upward or downward trend in the forecast, indicating that energy CPI values are expected to remain within a predictable range.
+
+Key Insights:
+
+1. Seasonal Energy Price Cycles:
+- The forecast highlights the recurring seasonal patterns in energy prices, with periodic peaks and troughs. Policymakers and businesses can use this information for budgeting or price stabilization strategies.
+2. Stability in Forecast:
+- The absence of a significant trend suggests stable energy pricing in the near future, assuming no major disruptions (e.g., geopolitical or supply chain crises).
+
+# Time Series Analsis and Forecasting for Electricity Sector
+```{r}
+# Filter data for Electricity sector
+electricity_data <- group2_long %>%
+  filter(TITLE == "Electricity") %>%
+  select(YEAR, Value)
+```
+
+```{r}
+# Convert the Electricity sector data to a time series
+electricity_ts <- ts(electricity_data$Value, start = c(2014, 1), frequency = 12) # Monthly frequency
+```
+
+
+```{r}
+# Fit an ARIMA model to the Electricity data
+electricity_arima <- auto.arima(electricity_ts)
+summary(electricity_arima)
+```
+
+```{r}
+# Perform residual diagnostics
+checkresiduals(electricity_arima)
+```
+# Ljung-Box Test for Electricity 
+
+The hypothesis for the Ljung-Box test is:
+
+H₀: The residuals are independent (i.e., there is no autocorrelation in the residuals). 
+H₁: The residuals are not independent (i.e., there is significant autocorrelation)
+
+- Test Statistic,  Q∗=42.662: This is the value of the Ljung-Box test statistic.
+- Degrees of Freedom (df) = 19: This is calculated based on the number of lags minus the number of estimated parameters in the model.
+- p-value = 0.001441: The p-value is below the standard significance level of 
+0.05
+
+Conclusion:
+
+No Significant Autocorrelation: Since p = 0.001441 is less than the standard significance level (\(\alpha = 0.05\)), we reject the null hypothesis of the Ljung-Box test. This suggests that there is significant autocorrelation remaining in the residuals.
+
+Model Adequacy:
+
+The presence of autocorrelation indicates that the residuals are not white noise. The ARIMA(0,0,3)(0,1,2)[12] model does not adequately capture all patterns in the data. Further refinement of the model is needed by revisiting AR, MA, or seasonal parameters.
+
+# Electricity Residuals Diagnostics:
+
+Observations:
+
+1. Time Series Residuals (Top Plot):
+- The residuals appear to oscillate around zero, indicating that the ARIMA model has captured the mean structure of the series.
+- There are notable spikes, particularly around 2025, which might suggest anomalies or outliers in the dataset.
+- Despite occasional deviations, no systematic trend or cyclic pattern is evident, which implies that the model has accounted for most systematic behavior in the data.
+
+2.ACF Plot (Bottom Left):
+- The majority of the autocorrelations lie within the confidence bands, showing minimal remaining autocorrelation in the residuals.
+- A few minor spikes at specific lags (e.g., near lag 6 and lag 36) suggest the presence of weak seasonal components that may not be fully explained by the current model.
+
+3. Residual Distribution (Bottom Right):
+- The residual histogram aligns closely with the overlaid normal curve, indicating that the residuals are approximately normally distributed.
+- However, the slight asymmetry or deviations from normality in the tails could be attributed to occasional large residuals (as seen in the time series residual plot).
+
+Key Insights:
+
+- The residual diagnostics confirm that the ARIMA(0,0,3)(0,1,2)[12] model captures the primary patterns in the data effectively.
+- The minimal autocorrelation and near-normal distribution of residuals indicate that the model assumptions are largely satisfied.
+- The slight seasonal autocorrelation in the ACF plot suggests that incorporating additional seasonal terms or refinements could improve the model, though the current fit appears robust for practical purposes.
+
+
+```{r}
+# Generate a forecast for the next 12 months
+forecast_electricity <- forecast(electricity_arima, h = 12)
+
+# Visualize the forecast
+autoplot(forecast_electricity) +
+  labs(title = "Forecast for Electricity CPI", y = "CPI", x = "Time")
+```
+Sector: Electricity
+
+Observations:
+
+1. Seasonality:
+T- he forecast highlights strong seasonality, with clear peaks and troughs repeating annually.
+- This reflects demand patterns, such as higher electricity usage during summer (cooling) and winter (heating).
+
+2. Trend:
+- The long-term trend is relatively stable, with no dramatic upward or downward movement.
+CPI values hover around a narrow range, indicating consistent pricing.
+
+Key Insights:
+
+1. Predictable Usage Patterns:
+Seasonal demand cycles dominate the electricity sector, making it highly predictable for consumers and policymakers.
+
+2. Stable Pricing:
+Minimal changes in the trend suggest the electricity sector is less prone to inflationary pressures compared to volatile sectors like energy or food.
+
+3. Implications:
+Consumers can expect predictable pricing, but any deviations from the forecast may indicate significant disruptions (e.g., energy crises or policy changes).
+
+# Time Series Analsis and Forecasting for the Apparel Sector
+
+```{r}
+# Filter data for Electricity sector
+apparel_data <- group1_long %>%
+  filter(TITLE == "Apparel") %>%
+  select(YEAR, Value)
+```
+
+```{r}
+# Convert the Apparel sector data to a time series
+apparel_ts <- ts(apparel_data$Value, start = c(2014, 1), frequency = 12) # Monthly frequency
+```
+
+```{r}
+# Fit an ARIMA model to the Apparel data
+apparel_arima <- auto.arima(apparel_ts)
+summary(apparel_arima)
+```
+
+```{r}
+# Perform residual diagnostics
+checkresiduals(apparel_arima)
+```
+# Ljung-Box Test for Apparel 
+
+- Test Statistic,  Q∗=58.91: This is the value of the Ljung-Box test statistic.
+- Degrees of Freedom (df) = 17: This is calculated based on the number of lags minus the number of estimated parameters in the model.
+- p-value = \( 1.589 \times 10^{-6} \) : The p-value is way below the standard significance level of 
+0.05
+
+Conclusion:
+
+Since \( p = 1.589 \times 10^{-6} \) is much smaller than the standard significance level (\(\alpha = 0.05\)), we reject the null hypothesis of the Ljung-Box test.  
+This suggests that there is significant autocorrelation remaining in the residuals.
+
+Model Adequacy:
+
+The residuals are not white noise, indicating that the ARIMA(1,0,3)(2,1,1)[12] model does not fully capture the underlying patterns in the data. Further adjustments to the model's parameters are required, potentially revisiting the AR, MA, or seasonal components to improve fit.
+
+# Apparel Residuals Diagnostics
+
+Observations:
+
+1. ime Series Residuals (Top Plot):
+
+- The residuals oscillate around zero, suggesting that the model has effectively captured the data's mean structure.
+- There are occasional sharp spikes, particularly around 2025, indicating potential outliers or anomalies not accounted for by the model.
+- No clear systematic pattern or trend is present, showing that the ARIMA(1,0,3)(2,1,1)[12] model addresses the primary dynamics of the series.
+
+2. ACF Plot (Bottom Left):
+
+- Most autocorrelation values are within the blue confidence bands, indicating that residual autocorrelation is generally minimal.
+- There are noticeable spikes at certain lags (e.g., lag 12 and lag 24), which may reflect weak seasonal patterns not fully explained by the model.
+
+3. Residual Distribution (Bottom Right):
+
+- The histogram of residuals aligns closely with the overlaid normal distribution curve, supporting the assumption of approximate normality.
+- There are minor deviations in the tails, which could suggest occasional extreme residual values but are not significant enough to undermine the overall normality assumption.
+
+Key Insights:
+- The residuals behaving as white noise (independent and identically distributed) validate the adequacy of the ARIMA(1,0,3)(2,1,1)[12] model.
+- The presence of seasonal spikes in the ACF plot indicates that the model captures seasonality reasonably well but might leave room for slight refinements in the seasonal components.
+- Overall, the model performs well and satisfies the key assumptions, making it suitable for forecasting. Further minor adjustments could address the small seasonal effects in the residuals if needed.
+
+
+```{r}
+# Generate a forecast for the next 12 months
+forecast_apparel <- forecast(apparel_arima, h = 12)
+
+# Visualize the forecast
+autoplot(forecast_apparel) +
+  labs(title = "Forecast for Apparel CPI", y = "CPI", x = "Time")
+```
+Sector: Apparel
+
+Observations:
+
+1. Seasonality:
+- The forecast for apparel CPI shows noticeable seasonality, with cycles likely influenced by consumer spending patterns (e.g., holiday shopping).
+2. Trend:
+- There is a slight upward drift in the CPI values, indicating mild inflation over time.
+- However, the increases are not steep, suggesting stability in apparel pricing.
+
+Key Insights:
+
+1. Moderate Inflation:
+- The sector shows a mild upward trend, which aligns with general inflation rates.
+
+2. Seasonal Variability:
+- Seasonal spikes may reflect holiday demand, promotional cycles, or fashion seasonality (e.g., fall/winter collections).
+
+Implications:
+Retailers and consumers can anticipate seasonal price variations, making it essential for consumers to plan purchases around sales periods.
+
+
+# Sector-Specific Insights:
+- Energy prices are highly volatile and influenced by external factors such as global oil prices and geopolitical events. The effective model fit may indicate that these factors exhibit patterns the ARIMA model could capture, such as seasonality or long-term trends.
+- The ARIMA model performed well because energy CPI is often subject to predictable, recurring patterns (e.g., seasonal fluctuations in fuel demand).
+
+- Electricity prices are influenced by factors such as seasonal demand, infrastructure changes, and energy policies. These influences may include non-linear or irregular patterns that the ARIMA model cannot easily accommodate, requiring further refinement or the inclusion of exogenous variables.
+- The model underperformed, possibly due to irregular or abrupt changes in electricity pricing that the ARIMA structure is unable to accommodate. Influences like energy market regulation or infrastructure upgrades may add noise that requires external predictors or a more sophisticated model.
+
+- Apparel prices are relatively stable but may experience short-term fluctuations due to factors such as supply chain disruptions, fashion trends, or seasonal changes. The lack of model fit may indicate that ARIMA is insufficient for modeling these shorter-term, irregular variations.
+- The inadequacy of the model may stem from smaller seasonal effects or external shocks (e.g., supply chain disruptions) that are not easily captured by a traditional ARIMA framework.
+
+# Conclusion on Sectoral Variations
+- The strong model performance for energy suggests that ARIMA works well for data with clear seasonality and long-term trends.
+- In contrast, the underperformance for electricity and apparel may highlight irregular shocks, non-linear trends, or weak seasonal effects that require model enhancements or alternative methodologies.
