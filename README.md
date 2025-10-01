@@ -1,7 +1,3 @@
-Great — I reviewed your **Inflation Analysis in the US Economy** project. Here’s a professional `README.md` draft you can use for GitHub:
-
----
-
 # Inflation Analysis in the US Economy
 
 ## 📌 Project Overview
